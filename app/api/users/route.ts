@@ -19,6 +19,13 @@ import {
   validateCreds,
 } from "@/lib/superwall";
 import type { AppInfo, SubscriberRow, UsersResponse } from "@/lib/types";
+import {
+  apiSecurityHeaders,
+  assertBrowserOrigin,
+  clientIp,
+  publicError,
+  rateLimit,
+} from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -89,11 +96,11 @@ function mapUser(row: RawUser): SubscriberRow {
   const autoRenew = status === "ACTIVE" && !willCancel && !isCancelled;
 
   return {
-    appUserId: row.appUserId,
-    displayUserId: displayUserId(row.appUserId),
+    appUserId: String(row.appUserId || "").slice(0, 512),
+    displayUserId: displayUserId(String(row.appUserId || "")),
     applicationId,
     appName: cleanAppName(row.appName, applicationId),
-    platform: row.platform || "",
+    platform: (row.platform || "").slice(0, 64),
     status,
     statusLabel: statusLabel({ status, willCancel, isCancelled, periodType }),
     entitlements: row.entitlements,
@@ -144,6 +151,41 @@ function mapUser(row: RawUser): SubscriberRow {
 }
 
 export async function GET(req: Request) {
+  const originErr = assertBrowserOrigin(req);
+  if (originErr) {
+    return NextResponse.json(
+      {
+        fetchedAt: new Date().toISOString(),
+        count: 0,
+        totalAvailable: 0,
+        apps: [],
+        users: [],
+        error: originErr,
+      } satisfies UsersResponse,
+      { status: 403, headers: apiSecurityHeaders() },
+    );
+  }
+
+  const ip = clientIp(req);
+  // Heavier endpoint — stricter limit
+  const rl = rateLimit(`users:${ip}`, 12, 60_000);
+  if (!rl.ok) {
+    const body: UsersResponse = {
+      fetchedAt: new Date().toISOString(),
+      count: 0,
+      totalAvailable: 0,
+      apps: [],
+      users: [],
+      error: "Too many requests. Wait a minute and try again.",
+    };
+    return NextResponse.json(body, {
+      status: 429,
+      headers: apiSecurityHeaders({
+        "Retry-After": String(rl.retryAfterSec),
+      }),
+    });
+  }
+
   const creds = credsFromRequest(req);
   if (!creds) {
     return NextResponse.json(
@@ -155,7 +197,7 @@ export async function GET(req: Request) {
         users: [],
         error: "Connect your Superwall account first.",
       } satisfies UsersResponse,
-      { status: 401 },
+      { status: 401, headers: apiSecurityHeaders() },
     );
   }
 
@@ -170,7 +212,7 @@ export async function GET(req: Request) {
         users: [],
         error: invalid,
       } satisfies UsersResponse,
-      { status: 400 },
+      { status: 400, headers: apiSecurityHeaders() },
     );
   }
 
@@ -198,21 +240,33 @@ export async function GET(req: Request) {
       users,
     };
 
-    return NextResponse.json(body, {
-      headers: {
-        "Cache-Control": "no-store, max-age=0",
-      },
-    });
+    return NextResponse.json(body, { headers: apiSecurityHeaders() });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
     const body: UsersResponse = {
       fetchedAt: new Date().toISOString(),
       count: 0,
       totalAvailable: 0,
       apps: [],
       users: [],
-      error: message,
+      error: publicError(err, "Could not load subscribers."),
     };
-    return NextResponse.json(body, { status: 500 });
+    return NextResponse.json(body, {
+      status: 500,
+      headers: apiSecurityHeaders(),
+    });
   }
+}
+
+export async function POST() {
+  return NextResponse.json(
+    {
+      fetchedAt: new Date().toISOString(),
+      count: 0,
+      totalAvailable: 0,
+      apps: [],
+      users: [],
+      error: "Method not allowed",
+    } satisfies UsersResponse,
+    { status: 405, headers: apiSecurityHeaders({ Allow: "GET" }) },
+  );
 }

@@ -1,3 +1,5 @@
+import { sanitizeHeader } from "@/lib/security";
+
 const API_BASE = "https://api.superwall.com/v2";
 
 export type SuperwallCreds = {
@@ -5,7 +7,13 @@ export type SuperwallCreds = {
   orgId: string;
 };
 
+/**
+ * Env credentials only when explicitly enabled (private self-host).
+ * Public multi-tenant deploys must NOT set ALLOW_ENV_CREDS — otherwise
+ * unauthenticated requests would serve that org's data.
+ */
 export function getEnvCreds(): SuperwallCreds | null {
+  if (process.env.ALLOW_ENV_CREDS !== "1") return null;
   const apiKey = process.env.SUPERWALL_API_KEY?.trim();
   const orgId = process.env.SUPERWALL_ORG_ID?.trim();
   if (!apiKey || !orgId) return null;
@@ -13,36 +21,57 @@ export function getEnvCreds(): SuperwallCreds | null {
 }
 
 export function credsFromRequest(req: Request): SuperwallCreds | null {
-  const headerKey = req.headers.get("x-superwall-api-key")?.trim();
-  const headerOrg = req.headers.get("x-superwall-org-id")?.trim();
+  const headerKey = sanitizeHeader(req.headers.get("x-superwall-api-key"), 512);
+  const headerOrg = sanitizeHeader(req.headers.get("x-superwall-org-id"), 32);
   if (headerKey && headerOrg) return { apiKey: headerKey, orgId: headerOrg };
   return getEnvCreds();
 }
 
 export function validateCreds(creds: SuperwallCreds): string | null {
-  if (!/^\d+$/.test(creds.orgId)) {
-    return "Organization ID should be a number.";
+  if (!/^\d{1,18}$/.test(creds.orgId)) {
+    return "Organization ID should be a number (digits only).";
   }
-  if (creds.apiKey.length < 10) {
-    return "That API key looks too short.";
+  // Superwall org API keys are long opaque strings; reject obvious junk
+  if (creds.apiKey.length < 16 || creds.apiKey.length > 512) {
+    return "That API key looks wrong. Create a key with data:read in Superwall.";
+  }
+  if (/\s/.test(creds.apiKey)) {
+    return "API key should not contain spaces. Paste it carefully.";
+  }
+  // Block obvious injection attempts in headers that get forwarded
+  if (/[\r\n]/.test(creds.apiKey) || /[\r\n]/.test(creds.orgId)) {
+    return "Invalid characters in credentials.";
   }
   return null;
+}
+
+/** Strict allowlist — only these exact static strings may be sent to Superwall. */
+const ALLOWED_SQL = new Set<string>();
+
+function registerAllowedSql(sql: string): string {
+  ALLOWED_SQL.add(sql);
+  return sql;
 }
 
 export async function runClickHouseQuery(
   sql: string,
   creds: SuperwallCreds,
 ): Promise<string> {
+  // Defense in depth: exact allowlist only (no user input ever reaches here)
+  if (!ALLOWED_SQL.has(sql)) {
+    throw new Error("Invalid query.");
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
   try {
-    const res = await fetch(`${API_BASE}/organizations/${creds.orgId}/query`, {
+    const res = await fetch(`${API_BASE}/organizations/${encodeURIComponent(creds.orgId)}/query`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${creds.apiKey}`,
         "Content-Type": "text/plain",
         Accept: "*/*",
-        "User-Agent": "SuperwallSubscribersDashboard/1.0",
+        "User-Agent": "SuperwallSubscribersDashboard/1.1",
       },
       body: sql,
       cache: "no-store",
@@ -56,7 +85,11 @@ export async function runClickHouseQuery(
           "Superwall rejected these credentials. Check the org ID and that the key has data:read.",
         );
       }
-      throw new Error(`Superwall Query API ${res.status}: ${text.slice(0, 400)}`);
+      if (res.status === 429) {
+        throw new Error("Superwall is rate-limiting requests. Wait a minute and try again.");
+      }
+      // Do not forward raw Superwall error bodies (may contain internal detail)
+      throw new Error(`Superwall Query API returned ${res.status}. Try again in a moment.`);
     }
     return text;
   } catch (err) {
@@ -73,16 +106,25 @@ export function parseJsonEachRow<T>(raw: string): T[] {
   const trimmed = raw.trim();
   if (!trimmed) return [];
   if (trimmed.startsWith("{") && trimmed.includes('"type":"api_error"')) {
-    throw new Error(trimmed.slice(0, 500));
+    throw new Error("Superwall returned an API error. Check credentials and try again.");
   }
-  return trimmed
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+  const lines = trimmed.split("\n").filter(Boolean);
+  // Hard cap rows parsed client-side for memory safety
+  const max = 50_000;
+  const slice = lines.length > max ? lines.slice(0, max) : lines;
+  const out: T[] = [];
+  for (const line of slice) {
+    try {
+      out.push(JSON.parse(line) as T);
+    } catch {
+      // skip corrupt lines rather than failing the whole payload
+    }
+  }
+  return out;
 }
 
 /** Prefer human app names over numeric App Store IDs when both exist. */
-export const APPS_SQL = `
+export const APPS_SQL = registerAllowedSql(`
 SELECT
   applicationId,
   coalesce(
@@ -95,9 +137,9 @@ WHERE isDeleted = 0
 GROUP BY applicationId
 ORDER BY name, platform
 FORMAT JSONEachRow
-`.trim();
+`.trim());
 
-export const PING_SQL = `
+export const PING_SQL = registerAllowedSql(`
 SELECT count() AS apps
 FROM (
   SELECT applicationId
@@ -106,13 +148,14 @@ FROM (
   GROUP BY applicationId
 )
 FORMAT JSONEachRow
-`.trim();
+`.trim());
 
 /**
  * All subscribers across apps in the connected Superwall org.
  * Uses revenue + status + usage. Infers next billing when expiration is missing.
+ * Static SQL only — no user input is ever interpolated.
  */
-export const USERS_SQL = `
+export const USERS_SQL = registerAllowedSql(`
 WITH
 apps AS (
   SELECT
@@ -455,4 +498,4 @@ ORDER BY
   coalesce(e.ltv, 0) DESC
 LIMIT 50000
 FORMAT JSONEachRow
-`.trim();
+`.trim());

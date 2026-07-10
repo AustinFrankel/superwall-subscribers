@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +13,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Subscribers",
-  description: "Live subscriber dashboard across all apps",
+  title: "Superwall Subscribers",
+  description:
+    "Simple live dashboard for Superwall subscribers. See who is active, cancelling, and renewing — across every app. Built by Austin Frankel.",
+  applicationName: "Superwall Subscribers",
+  authors: [{ name: "Austin Frankel", url: "https://github.com/AustinFrankel" }],
+  openGraph: {
+    title: "Superwall Subscribers",
+    description:
+      "Live Superwall subscriber dashboard. Connect with a read-only API key.",
+    type: "website",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#0f766e",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
