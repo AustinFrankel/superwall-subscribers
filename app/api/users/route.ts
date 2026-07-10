@@ -16,11 +16,13 @@ import {
   credsFromRequest,
   parseJsonEachRow,
   runClickHouseQuery,
+  validateCreds,
 } from "@/lib/superwall";
 import type { AppInfo, SubscriberRow, UsersResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const maxDuration = 120;
 
 type RawUser = {
   appUserId: string;
@@ -33,6 +35,7 @@ type RawUser = {
   ltv: number | string;
   lastPrice: number | string | null;
   paidPrice: number | string | null;
+  catalogPrice: number | string | null;
   productId: string | null;
   periodType: string | null;
   nextBillingAt: string | null;
@@ -77,6 +80,7 @@ function mapUser(row: RawUser): SubscriberRow {
   const periodStartAt = sanitizeDate(row.periodStartAt);
   const lastPrice = toNum(row.lastPrice);
   const paidPrice = toNum(row.paidPrice);
+  const catalogPrice = toNum(row.catalogPrice);
   const billingPeriodDays = inferPeriodDays(
     toNum(row.billingPeriodDays),
     productId,
@@ -97,9 +101,11 @@ function mapUser(row: RawUser): SubscriberRow {
     ltv: toNum(row.ltv) ?? 0,
     lastPrice,
     paidPrice,
+    catalogPrice,
     priceLabel: priceLabel({
       lastPrice,
       paidPrice,
+      catalogPrice,
       periodType,
       currencyCode: row.currencyCode,
     }),
@@ -150,6 +156,21 @@ export async function GET(req: Request) {
         error: "Connect your Superwall account first.",
       } satisfies UsersResponse,
       { status: 401 },
+    );
+  }
+
+  const invalid = validateCreds(creds);
+  if (invalid) {
+    return NextResponse.json(
+      {
+        fetchedAt: new Date().toISOString(),
+        count: 0,
+        totalAvailable: 0,
+        apps: [],
+        users: [],
+        error: invalid,
+      } satisfies UsersResponse,
+      { status: 400 },
     );
   }
 

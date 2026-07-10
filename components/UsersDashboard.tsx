@@ -12,7 +12,7 @@ import { fmtDate, fmtDateTime, money, renewCountdown } from "@/lib/format";
 import type { SubscriberRow, UsersResponse } from "@/lib/types";
 
 type TimePeriod = "all" | "7d" | "30d" | "90d" | "year";
-type StatusFilter = "all" | "active" | "cancelling" | "trial" | "inactive";
+type StatusFilter = "subscribed" | "all" | "active" | "cancelling" | "trial" | "inactive";
 type SortKey = "renew" | "spend" | "recent" | "usage";
 
 const REFRESH_MS = 45_000;
@@ -132,9 +132,10 @@ function ConnectScreen({
           <input
             value={orgId}
             onChange={(e) => setOrgId(e.target.value)}
-            placeholder="12345"
+            placeholder="Organization ID"
             autoComplete="off"
             spellCheck={false}
+            inputMode="numeric"
           />
         </label>
 
@@ -144,7 +145,7 @@ function ConnectScreen({
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk_…"
+            placeholder="API key with data:read"
             autoComplete="off"
             spellCheck={false}
           />
@@ -178,7 +179,7 @@ export default function UsersDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [appFilter, setAppFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("subscribed");
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
   const [sortKey, setSortKey] = useState<SortKey>("renew");
 
@@ -230,11 +231,25 @@ export default function UsersDashboard() {
   async function handleConnect(next: StoredCreds) {
     setLoading(true);
     setError(null);
-    const ok = await load(false, next);
-    if (ok) {
-      saveCreds(next);
-      setCreds(next);
-    } else {
+    try {
+      const ping = await fetch("/api/ping", {
+        cache: "no-store",
+        headers: authHeaders(next),
+      });
+      const pingJson = (await ping.json()) as { ok?: boolean; error?: string; apps?: number };
+      if (!ping.ok || !pingJson.ok) {
+        setError(pingJson.error || "Could not connect with those credentials.");
+        setLoading(false);
+        return;
+      }
+
+      const ok = await load(false, next);
+      if (ok) {
+        saveCreds(next);
+        setCreds(next);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not connect");
       setLoading(false);
     }
   }
@@ -283,6 +298,7 @@ export default function UsersDashboard() {
         }
       }
 
+      if (statusFilter === "subscribed" && u.status !== "ACTIVE") return false;
       if (statusFilter === "active" && (u.status !== "ACTIVE" || u.willCancel)) return false;
       if (statusFilter === "cancelling" && !u.willCancel) return false;
       if (statusFilter === "inactive" && u.status === "ACTIVE") return false;
@@ -486,11 +502,12 @@ export default function UsersDashboard() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             >
-              <option value="all">All statuses</option>
-              <option value="active">Active (renewing)</option>
+              <option value="subscribed">Subscribed</option>
+              <option value="active">Renewing</option>
               <option value="cancelling">Cancelling</option>
               <option value="trial">On trial</option>
               <option value="inactive">Inactive</option>
+              <option value="all">Everyone</option>
             </select>
             <select
               className="select"

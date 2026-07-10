@@ -24,6 +24,7 @@ export type SubscriberRow = {
   ltv: number;
   lastPrice: number | null;
   paidPrice: number | null;
+  catalogPrice: number | null;
   priceLabel: string;
   productId: string | null;
   productLabel: string;

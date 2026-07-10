@@ -154,21 +154,22 @@ export function money(amount: number | null | undefined, currency?: string | nul
 export function priceLabel(opts: {
   lastPrice: number | null;
   paidPrice: number | null;
+  catalogPrice?: number | null;
   periodType: string | null;
   currencyCode: string | null;
 }): string {
+  const catalog =
+    opts.catalogPrice && opts.catalogPrice > 0 ? opts.catalogPrice : null;
+  const paid = opts.paidPrice && opts.paidPrice > 0 ? opts.paidPrice : null;
+  const last = opts.lastPrice && opts.lastPrice > 0 ? opts.lastPrice : null;
+
   if ((opts.periodType || "").toUpperCase() === "TRIAL") {
-    if (opts.paidPrice && opts.paidPrice > 0) {
-      return `Trial → ${money(opts.paidPrice, opts.currencyCode)}`;
-    }
+    const after = paid ?? catalog;
+    if (after) return `Trial → ${money(after, opts.currencyCode)}`;
     return "Free trial";
   }
-  const amount =
-    opts.lastPrice && opts.lastPrice > 0
-      ? opts.lastPrice
-      : opts.paidPrice && opts.paidPrice > 0
-        ? opts.paidPrice
-        : null;
+
+  const amount = last ?? paid ?? catalog;
   if (amount === null) return "—";
   return money(amount, opts.currencyCode);
 }

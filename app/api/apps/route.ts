@@ -5,6 +5,7 @@ import {
   credsFromRequest,
   parseJsonEachRow,
   runClickHouseQuery,
+  validateCreds,
 } from "@/lib/superwall";
 import type { AppInfo } from "@/lib/types";
 
@@ -18,6 +19,11 @@ export async function GET(req: Request) {
       { error: "Connect your Superwall account first.", apps: [] },
       { status: 401 },
     );
+  }
+
+  const invalid = validateCreds(creds);
+  if (invalid) {
+    return NextResponse.json({ error: invalid, apps: [] }, { status: 400 });
   }
 
   try {

@@ -28,8 +28,8 @@ npm run dev
 Optional: put keys in `.env.local` instead of the connect screen.
 
 ```bash
-SUPERWALL_API_KEY=sk_...
-SUPERWALL_ORG_ID=12345
+SUPERWALL_API_KEY=
+SUPERWALL_ORG_ID=
 ```
 
 ## Deploy
