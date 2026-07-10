@@ -14,6 +14,8 @@ export const SUPERWALL_DASHBOARD_URL = "https://superwall.com";
 export const GITHUB_REPO_URL =
   "https://github.com/AustinFrankel/superwall-subscribers";
 
+export const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/austinfrankel";
+
 export function loadCreds(): StoredCreds | null {
   if (typeof window === "undefined") return null;
   try {

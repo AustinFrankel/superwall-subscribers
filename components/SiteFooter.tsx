@@ -1,4 +1,4 @@
-import { GITHUB_REPO_URL } from "@/lib/creds";
+import { BUY_ME_A_COFFEE_URL, GITHUB_REPO_URL } from "@/lib/creds";
 
 export default function SiteFooter({ dark = false }: { dark?: boolean }) {
   return (
@@ -15,6 +15,14 @@ export default function SiteFooter({ dark = false }: { dark?: boolean }) {
         {" · "}
         <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
           GitHub
+        </a>
+        {" · "}
+        <a
+          href={BUY_ME_A_COFFEE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Buy me a coffee
         </a>
       </p>
     </footer>
