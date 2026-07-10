@@ -17,19 +17,20 @@ export function middleware() {
     "Strict-Transport-Security",
     "max-age=63072000; includeSubDomains; preload",
   );
-  // CSP: self only; no inline scripts (Next may need 'unsafe-inline' for styles in some cases)
+  // CSP: app + Buy Me a Coffee widget
   res.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.buymeacoffee.com",
+      "style-src 'self' 'unsafe-inline' https://cdnjs.buymeacoffee.com https://fonts.googleapis.com",
       "img-src 'self' data: blob: https:",
-      "font-src 'self' data:",
-      "connect-src 'self'",
+      "font-src 'self' data: https://cdnjs.buymeacoffee.com https://fonts.gstatic.com",
+      "connect-src 'self' https://www.buymeacoffee.com https://buymeacoffee.com https://cdnjs.buymeacoffee.com",
+      "frame-src https://www.buymeacoffee.com https://buymeacoffee.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
-      "form-action 'self'",
+      "form-action 'self' https://www.buymeacoffee.com https://buymeacoffee.com",
       "object-src 'none'",
     ].join("; "),
   );
