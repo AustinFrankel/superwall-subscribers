@@ -11,13 +11,17 @@ import type { AppInfo } from "@/lib/types";
 import {
   apiSecurityHeaders,
   assertBrowserOrigin,
-  clientIp,
   publicError,
-  rateLimit,
+  rateLimitAsync,
+  rateLimitHeaders,
+  rateLimitKey,
 } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const LIMIT = 30;
+const WINDOW_MS = 60_000;
 
 export async function GET(req: Request) {
   const originErr = assertBrowserOrigin(req);
@@ -28,21 +32,22 @@ export async function GET(req: Request) {
     );
   }
 
-  const ip = clientIp(req);
-  const rl = rateLimit(`apps:${ip}`, 30, 60_000);
+  const creds = credsFromRequest(req);
+  const rl = await rateLimitAsync(
+    rateLimitKey("apps", req, creds?.apiKey, creds?.orgId),
+    LIMIT,
+    WINDOW_MS,
+  );
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many requests. Wait a minute and try again.", apps: [] },
       {
         status: 429,
-        headers: apiSecurityHeaders({
-          "Retry-After": String(rl.retryAfterSec),
-        }),
+        headers: apiSecurityHeaders(rateLimitHeaders(rl, LIMIT)),
       },
     );
   }
 
-  const creds = credsFromRequest(req);
   if (!creds) {
     return NextResponse.json(
       { error: "Connect your Superwall account first.", apps: [] },
@@ -70,7 +75,12 @@ export async function GET(req: Request) {
     });
     return NextResponse.json(
       { fetchedAt: new Date().toISOString(), apps },
-      { headers: apiSecurityHeaders() },
+      {
+        headers: apiSecurityHeaders({
+          "X-RateLimit-Remaining": String(rl.remaining),
+          "X-RateLimit-Backend": rl.backend,
+        }),
+      },
     );
   } catch (err) {
     return NextResponse.json(

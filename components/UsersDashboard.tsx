@@ -352,7 +352,7 @@ function ConnectScreen({
                 <input
                   value={orgId}
                   onChange={(e) => setOrgId(e.target.value)}
-                  placeholder="e.g. 123456"
+                  placeholder="Numbers only"
                   autoComplete="off"
                   spellCheck={false}
                   inputMode="numeric"
@@ -393,7 +393,7 @@ function ConnectScreen({
                   setPasteAll(v);
                   tryPastePair(v);
                 }}
-                placeholder={"123456|your_api_key\nor JSON: {\"orgId\":\"…\",\"apiKey\":\"…\"}"}
+                placeholder={'orgId|api_key\nor JSON: {"orgId":"…","apiKey":"…"}'}
                 rows={4}
                 spellCheck={false}
                 autoComplete="off"

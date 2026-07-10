@@ -7,10 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "qa": "npm run qa:format && npm run qa:security",
     "qa:format": "npx tsx scripts/qa-format.ts",
-    "qa:e2e": "npx tsx scripts/qa-e2e.ts"
+    "qa:security": "npx tsx scripts/qa-security.ts",
+    "qa:smoke": "npx tsx scripts/qa-api-smoke.ts",
+    "qa:e2e": "npx tsx scripts/qa-e2e.ts",
+    "qa:all": "npm run lint && npm run qa && npm run build"
   },
   "dependencies": {
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"

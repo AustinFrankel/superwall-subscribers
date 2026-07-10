@@ -9,13 +9,17 @@ import {
 import {
   apiSecurityHeaders,
   assertBrowserOrigin,
-  clientIp,
   publicError,
-  rateLimit,
+  rateLimitAsync,
+  rateLimitHeaders,
+  rateLimitKey,
 } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const LIMIT = 20;
+const WINDOW_MS = 60_000;
 
 export async function GET(req: Request) {
   const originErr = assertBrowserOrigin(req);
@@ -26,21 +30,22 @@ export async function GET(req: Request) {
     );
   }
 
-  const ip = clientIp(req);
-  const rl = rateLimit(`ping:${ip}`, 20, 60_000);
+  const creds = credsFromRequest(req);
+  const rl = await rateLimitAsync(
+    rateLimitKey("ping", req, creds?.apiKey, creds?.orgId),
+    LIMIT,
+    WINDOW_MS,
+  );
   if (!rl.ok) {
     return NextResponse.json(
       { ok: false, error: "Too many requests. Wait a minute and try again." },
       {
         status: 429,
-        headers: apiSecurityHeaders({
-          "Retry-After": String(rl.retryAfterSec),
-        }),
+        headers: apiSecurityHeaders(rateLimitHeaders(rl, LIMIT)),
       },
     );
   }
 
-  const creds = credsFromRequest(req);
   if (!creds) {
     return NextResponse.json(
       { ok: false, error: "Connect your Superwall account first." },
@@ -64,9 +69,15 @@ export async function GET(req: Request) {
       {
         ok: true,
         apps,
+        // orgId is not a secret; helps the UI confirm which org connected
         orgId: creds.orgId,
       },
-      { headers: apiSecurityHeaders() },
+      {
+        headers: apiSecurityHeaders({
+          "X-RateLimit-Remaining": String(rl.remaining),
+          "X-RateLimit-Backend": rl.backend,
+        }),
+      },
     );
   } catch (err) {
     return NextResponse.json(

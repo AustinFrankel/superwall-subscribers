@@ -22,14 +22,18 @@ import type { AppInfo, SubscriberRow, UsersResponse } from "@/lib/types";
 import {
   apiSecurityHeaders,
   assertBrowserOrigin,
-  clientIp,
   publicError,
-  rateLimit,
+  rateLimitAsync,
+  rateLimitHeaders,
+  rateLimitKey,
 } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 120;
+
+const LIMIT = 12;
+const WINDOW_MS = 60_000;
 
 type RawUser = {
   appUserId: string;
@@ -74,6 +78,17 @@ function toBool(v: number | string | boolean | null | undefined): boolean {
   if (typeof v === "boolean") return v;
   if (v === 1 || v === "1" || v === "true") return true;
   return false;
+}
+
+function emptyBody(error: string): UsersResponse {
+  return {
+    fetchedAt: new Date().toISOString(),
+    count: 0,
+    totalAvailable: 0,
+    apps: [],
+    users: [],
+    error,
+  };
 }
 
 function mapUser(row: RawUser): SubscriberRow {
@@ -153,67 +168,41 @@ function mapUser(row: RawUser): SubscriberRow {
 export async function GET(req: Request) {
   const originErr = assertBrowserOrigin(req);
   if (originErr) {
-    return NextResponse.json(
-      {
-        fetchedAt: new Date().toISOString(),
-        count: 0,
-        totalAvailable: 0,
-        apps: [],
-        users: [],
-        error: originErr,
-      } satisfies UsersResponse,
-      { status: 403, headers: apiSecurityHeaders() },
-    );
-  }
-
-  const ip = clientIp(req);
-  // Heavier endpoint — stricter limit
-  const rl = rateLimit(`users:${ip}`, 12, 60_000);
-  if (!rl.ok) {
-    const body: UsersResponse = {
-      fetchedAt: new Date().toISOString(),
-      count: 0,
-      totalAvailable: 0,
-      apps: [],
-      users: [],
-      error: "Too many requests. Wait a minute and try again.",
-    };
-    return NextResponse.json(body, {
-      status: 429,
-      headers: apiSecurityHeaders({
-        "Retry-After": String(rl.retryAfterSec),
-      }),
+    return NextResponse.json(emptyBody(originErr), {
+      status: 403,
+      headers: apiSecurityHeaders(),
     });
   }
 
   const creds = credsFromRequest(req);
+  const rl = await rateLimitAsync(
+    rateLimitKey("users", req, creds?.apiKey, creds?.orgId),
+    LIMIT,
+    WINDOW_MS,
+  );
+  if (!rl.ok) {
+    return NextResponse.json(
+      emptyBody("Too many requests. Wait a minute and try again."),
+      {
+        status: 429,
+        headers: apiSecurityHeaders(rateLimitHeaders(rl, LIMIT)),
+      },
+    );
+  }
+
   if (!creds) {
     return NextResponse.json(
-      {
-        fetchedAt: new Date().toISOString(),
-        count: 0,
-        totalAvailable: 0,
-        apps: [],
-        users: [],
-        error: "Connect your Superwall account first.",
-      } satisfies UsersResponse,
+      emptyBody("Connect your Superwall account first."),
       { status: 401, headers: apiSecurityHeaders() },
     );
   }
 
   const invalid = validateCreds(creds);
   if (invalid) {
-    return NextResponse.json(
-      {
-        fetchedAt: new Date().toISOString(),
-        count: 0,
-        totalAvailable: 0,
-        apps: [],
-        users: [],
-        error: invalid,
-      } satisfies UsersResponse,
-      { status: 400, headers: apiSecurityHeaders() },
-    );
+    return NextResponse.json(emptyBody(invalid), {
+      status: 400,
+      headers: apiSecurityHeaders(),
+    });
   }
 
   try {
@@ -240,33 +229,23 @@ export async function GET(req: Request) {
       users,
     };
 
-    return NextResponse.json(body, { headers: apiSecurityHeaders() });
-  } catch (err) {
-    const body: UsersResponse = {
-      fetchedAt: new Date().toISOString(),
-      count: 0,
-      totalAvailable: 0,
-      apps: [],
-      users: [],
-      error: publicError(err, "Could not load subscribers."),
-    };
     return NextResponse.json(body, {
-      status: 500,
-      headers: apiSecurityHeaders(),
+      headers: apiSecurityHeaders({
+        "X-RateLimit-Remaining": String(rl.remaining),
+        "X-RateLimit-Backend": rl.backend,
+      }),
     });
+  } catch (err) {
+    return NextResponse.json(
+      emptyBody(publicError(err, "Could not load subscribers.")),
+      { status: 500, headers: apiSecurityHeaders() },
+    );
   }
 }
 
 export async function POST() {
-  return NextResponse.json(
-    {
-      fetchedAt: new Date().toISOString(),
-      count: 0,
-      totalAvailable: 0,
-      apps: [],
-      users: [],
-      error: "Method not allowed",
-    } satisfies UsersResponse,
-    { status: 405, headers: apiSecurityHeaders({ Allow: "GET" }) },
-  );
+  return NextResponse.json(emptyBody("Method not allowed"), {
+    status: 405,
+    headers: apiSecurityHeaders({ Allow: "GET" }),
+  });
 }

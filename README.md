@@ -28,7 +28,7 @@ Superwall does **not** offer one-click OAuth for third-party dashboards. You cre
 On mobile you can use **One paste**: put both in one box as:
 
 ```text
-123456|your_api_key_here
+YOUR_ORG_ID|your_api_key_here
 ```
 
 ### One-link pairing (easiest way to open again)
@@ -49,10 +49,26 @@ The secret lives in the **URL hash** (`#connect=…`), so it is **not** sent to 
 | Where keys live | Your browser `localStorage` only |
 | Server storage | **None** — we never save your API key |
 | API proxy | Browser → this app → Superwall (key in request headers only) |
-| SQL | Static queries only — **no user input** is interpolated |
-| Rate limits | Per-IP limits on `/api/*` |
+| SQL | Exact allowlist of static queries only |
+| Rate limits | **Upstash Redis** sliding window when configured; in-memory fallback otherwise. Keys = IP + credential fingerprint (never the raw API key) |
+| Origin | Cross-site browser calls blocked |
 | Headers | CSP, HSTS, `X-Frame-Options: DENY`, no-store on APIs |
 | Permissions | Use **`data:read` only** |
+| Dummy data | **None** — unauthenticated APIs return empty lists |
+
+### Redis rate limiting (recommended)
+
+1. Create a free Redis database at [Upstash](https://upstash.com).
+2. In Vercel → Project → Settings → Environment Variables, add:
+
+```bash
+UPSTASH_REDIS_REST_URL=https://….upstash.io
+UPSTASH_REDIS_REST_TOKEN=…
+```
+
+3. Redeploy. Check `GET /api/health` — `"rateLimit":"redis"`.
+
+Without Redis the app still works with per-instance memory limits.
 
 This is designed so the dashboard is hard to abuse: no cookie sessions to steal for Superwall, no writable Superwall actions, and no secret stored server-side for the public connect flow.
 
@@ -84,12 +100,22 @@ accidentally expose your org if those vars are set.
 ## Scripts
 
 ```bash
-npm run build      # production build
-npm run start      # serve production build
+npm run build         # production build
+npm run start         # serve production build
 npm run lint
-npm run qa:format # unit checks for format helpers
-# e2e (needs real Superwall creds + running server):
+npm run qa            # format + security/privacy static QA
+npm run qa:smoke      # API smoke vs running server (no Superwall key needed)
+npm run qa:all        # lint + qa + production build
+# live Superwall e2e (needs real creds + running server):
 SUPERWALL_API_KEY=… SUPERWALL_ORG_ID=… npm run qa:e2e
+```
+
+Smoke test:
+
+```bash
+npm run build && npm run start &
+sleep 2
+BASE_URL=http://localhost:3000 npm run qa:smoke
 ```
 
 ---

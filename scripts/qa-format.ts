@@ -25,8 +25,8 @@ assert(sanitizeDate("1970-01-01 00:00:00") === null, "1970 sanitized");
 assert(displayUserId("$SuperwallAlias:ABCDEFGH12345678") === "ABCDEFGH…5678", "alias shortened");
 assert(cleanAppName("6770344832", 45676) === "App 45676", "numeric app name cleaned");
 assert(cleanAppName("My Cool App", 1) === "My Cool App", "human app name kept");
-assert(humanProduct("seatmaker_pro_weekly_v3") === "Weekly", "weekly product");
-assert(humanProduct("com.timeCapsule.yearly1") === "Yearly", "yearly product");
+assert(humanProduct("example_pro_weekly_v3") === "Weekly", "weekly product");
+assert(humanProduct("com.example.app.yearly1") === "Yearly", "yearly product");
 
 assert(
   priceLabel({
