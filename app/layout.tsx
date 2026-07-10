@@ -15,13 +15,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Superwall Subscribers",
   description:
-    "Simple live dashboard for Superwall subscribers. See who is active, cancelling, and renewing — across every app. Built by Austin Frankel.",
+    "See who pays, who cancels, and when they renew. Built by Austin Frankel.",
   applicationName: "Superwall Subscribers",
   authors: [{ name: "Austin Frankel", url: "https://github.com/AustinFrankel" }],
   openGraph: {
     title: "Superwall Subscribers",
-    description:
-      "Live Superwall subscriber dashboard. Connect with a read-only API key.",
+    description: "Live Superwall subscriber dashboard.",
     type: "website",
   },
   robots: {
@@ -34,7 +33,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#0f766e",
+  themeColor: "#13151A",
   viewportFit: "cover",
 };
 

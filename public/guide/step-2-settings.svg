@@ -1,37 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" role="img" aria-label="Step 2: Open Settings then API Keys">
-  <defs>
-    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#1e293b"/>
-    </linearGradient>
-    <filter id="sh2" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.35"/>
-    </filter>
-  </defs>
-  <rect width="720" height="420" fill="url(#bg2)"/>
-  <g filter="url(#sh2)">
-    <rect x="48" y="40" width="624" height="340" rx="14" fill="#0b1220" stroke="#334155"/>
-    <!-- sidebar -->
-    <rect x="48" y="40" width="168" height="340" rx="14" fill="#111827"/>
-    <rect x="48" y="40" width="168" height="40" fill="#111827"/>
-    <text x="68" y="68" fill="#e2e8f0" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13" font-weight="700">Menu</text>
-    <text x="68" y="110" fill="#94a3b8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Overview</text>
-    <text x="68" y="140" fill="#94a3b8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Campaigns</text>
-    <text x="68" y="170" fill="#94a3b8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Customers</text>
-    <!-- Settings highlighted -->
-    <rect x="60" y="188" width="144" height="32" rx="8" fill="#0f766e"/>
-    <text x="76" y="209" fill="#f0fdfa" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="700">⚙ Settings</text>
-    <text x="68" y="250" fill="#94a3b8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12">Help</text>
-    <!-- main -->
-    <text x="240" y="80" fill="#f8fafc" font-family="ui-sans-serif,system-ui,sans-serif" font-size="18" font-weight="700">Settings</text>
-    <rect x="240" y="110" width="200" height="44" rx="10" fill="#1e293b" stroke="#334155"/>
-    <text x="256" y="137" fill="#cbd5e1" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">General</text>
-    <rect x="240" y="166" width="200" height="44" rx="10" fill="#134e4a" stroke="#2dd4bf" stroke-width="2"/>
-    <text x="256" y="193" fill="#ecfdf5" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13" font-weight="700">🔑 API Keys</text>
-    <rect x="240" y="222" width="200" height="44" rx="10" fill="#1e293b" stroke="#334155"/>
-    <text x="256" y="249" fill="#cbd5e1" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13">Team</text>
-  </g>
-  <rect x="470" y="300" width="180" height="56" rx="12" fill="#ccfbf1"/>
-  <text x="486" y="324" fill="#0f766e" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13" font-weight="700">2. Settings → API Keys</text>
-  <text x="486" y="342" fill="#115e59" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11">Click API Keys</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="400" viewBox="0 0 720 400" role="img" aria-label="Step 2: Settings then Keys">
+  <rect width="720" height="400" fill="#13151A"/>
+  <rect x="40" y="30" width="640" height="340" rx="14" fill="#0f1115" stroke="#2a2e38"/>
+  <!-- left nav -->
+  <rect x="40" y="30" width="180" height="340" rx="14" fill="#0a0c10"/>
+  <text x="64" y="70" fill="#8b919c" font-family="system-ui,sans-serif" font-size="13">General</text>
+  <rect x="52" y="88" width="156" height="32" rx="8" fill="#1a2a28"/>
+  <text x="64" y="109" fill="#74FFF1" font-family="system-ui,sans-serif" font-size="14" font-weight="700">Keys</text>
+  <text x="64" y="148" fill="#8b919c" font-family="system-ui,sans-serif" font-size="13">Billing</text>
+  <text x="64" y="180" fill="#8b919c" font-family="system-ui,sans-serif" font-size="13">Team</text>
+  <text x="64" y="212" fill="#8b919c" font-family="system-ui,sans-serif" font-size="13">Projects</text>
+  <!-- main -->
+  <text x="250" y="70" fill="#f4f5f7" font-family="system-ui,sans-serif" font-size="22" font-weight="700">Settings</text>
+  <text x="250" y="100" fill="#8b919c" font-family="system-ui,sans-serif" font-size="13">Click Keys in the left menu</text>
+  <rect x="250" y="130" width="380" height="200" rx="12" fill="#1a1d24" stroke="#2a2e38"/>
+  <text x="274" y="170" fill="#f4f5f7" font-family="system-ui,sans-serif" font-size="16" font-weight="600">Keys</text>
+  <text x="274" y="200" fill="#8b919c" font-family="system-ui,sans-serif" font-size="12">Public API Key</text>
+  <rect x="274" y="214" width="280" height="32" rx="8" fill="#252830"/>
+  <text x="288" y="234" fill="#6b7280" font-family="ui-monospace,monospace" font-size="12">pk_••••••••</text>
+  <text x="274" y="280" fill="#f4f5f7" font-family="system-ui,sans-serif" font-size="14" font-weight="600">Organization API Keys</text>
+  <rect x="480" y="260" width="120" height="32" rx="16" fill="#74FFF1"/>
+  <text x="498" y="280" fill="#13151A" font-family="system-ui,sans-serif" font-size="12" font-weight="700">+ New API Key</text>
 </svg>

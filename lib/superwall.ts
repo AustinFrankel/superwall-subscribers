@@ -9,8 +9,6 @@ export type SuperwallCreds = {
 
 /**
  * Env credentials only when explicitly enabled (private self-host).
- * Public multi-tenant deploys must NOT set ALLOW_ENV_CREDS — otherwise
- * unauthenticated requests would serve that org's data.
  */
 export function getEnvCreds(): SuperwallCreds | null {
   if (process.env.ALLOW_ENV_CREDS !== "1") return null;
@@ -20,29 +18,138 @@ export function getEnvCreds(): SuperwallCreds | null {
   return { apiKey, orgId };
 }
 
-export function credsFromRequest(req: Request): SuperwallCreds | null {
+/** Raw headers (org optional — we can resolve it from the key). */
+export function rawCredsFromRequest(req: Request): {
+  apiKey: string;
+  orgId: string;
+} | null {
   const headerKey = sanitizeHeader(req.headers.get("x-superwall-api-key"), 512);
   const headerOrg = sanitizeHeader(req.headers.get("x-superwall-org-id"), 32);
-  if (headerKey && headerOrg) return { apiKey: headerKey, orgId: headerOrg };
+  if (headerKey) {
+    return { apiKey: headerKey, orgId: headerOrg };
+  }
   return getEnvCreds();
 }
 
+export function validateApiKey(apiKey: string): string | null {
+  if (apiKey.length < 16 || apiKey.length > 512) {
+    return "That API key looks too short. Use an Organization API Key (starts with sk_).";
+  }
+  if (apiKey.startsWith("pk_")) {
+    return "That’s a public app key (pk_). Use an Organization API Key (sk_) from Settings → Keys.";
+  }
+  if (/\s/.test(apiKey) || /[\r\n]/.test(apiKey)) {
+    return "API key should not contain spaces.";
+  }
+  return null;
+}
+
 export function validateCreds(creds: SuperwallCreds): string | null {
+  const keyErr = validateApiKey(creds.apiKey);
+  if (keyErr) return keyErr;
   if (!/^\d{1,18}$/.test(creds.orgId)) {
-    return "Organization ID should be a number (digits only).";
+    return "Could not find your organization. Check the API key.";
   }
-  // Superwall org API keys are long opaque strings; reject obvious junk
-  if (creds.apiKey.length < 16 || creds.apiKey.length > 512) {
-    return "That API key looks wrong. Create a key with data:read in Superwall.";
-  }
-  if (/\s/.test(creds.apiKey)) {
-    return "API key should not contain spaces. Paste it carefully.";
-  }
-  // Block obvious injection attempts in headers that get forwarded
-  if (/[\r\n]/.test(creds.apiKey) || /[\r\n]/.test(creds.orgId)) {
+  if (/[\r\n]/.test(creds.orgId)) {
     return "Invalid characters in credentials.";
   }
   return null;
+}
+
+/** Short-lived org cache (fingerprint → orgId) so refresh doesn't re-hit /projects every time. */
+const orgCache = new Map<string, { orgId: string; exp: number }>();
+const ORG_CACHE_MS = 10 * 60_000;
+
+function keyFp(apiKey: string): string {
+  // lightweight non-crypto fingerprint for cache only (not security)
+  let h = 0;
+  for (let i = 0; i < apiKey.length; i++) h = (h * 33 + apiKey.charCodeAt(i)) >>> 0;
+  return `${apiKey.length}:${h.toString(16)}`;
+}
+
+/**
+ * Resolve organization ID from an org API key via /v2/projects.
+ * Users often paste App Store IDs by mistake — this removes that step.
+ */
+export async function resolveOrgId(apiKey: string): Promise<string> {
+  const fp = keyFp(apiKey);
+  const hit = orgCache.get(fp);
+  if (hit && hit.exp > Date.now()) return hit.orgId;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const res = await fetch(`${API_BASE}/projects`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+        "User-Agent": "SuperwallSubscribersDashboard/1.2",
+      },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(
+        "Superwall rejected this key. Use an Organization API Key (sk_) from Settings → Keys.",
+      );
+    }
+    if (!res.ok) {
+      throw new Error("Could not look up your Superwall account. Try again.");
+    }
+    let data: {
+      data?: Array<{ organization_id?: number | string }>;
+    };
+    try {
+      data = JSON.parse(text) as typeof data;
+    } catch {
+      throw new Error("Unexpected response from Superwall.");
+    }
+    const org = data.data?.find((p) => p.organization_id != null)?.organization_id;
+    if (org == null) {
+      throw new Error("No projects found for this key.");
+    }
+    const orgId = String(org);
+    orgCache.set(fp, { orgId, exp: Date.now() + ORG_CACHE_MS });
+    return orgId;
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Superwall timed out. Try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Full credentials from the request.
+ * Always resolves org from the API key (via /v2/projects) so people
+ * who paste an App Store ID never get stuck with a bad org number.
+ */
+export async function resolveCredsFromRequest(
+  req: Request,
+): Promise<{ creds: SuperwallCreds | null; error?: string }> {
+  const raw = rawCredsFromRequest(req);
+  if (!raw) return { creds: null };
+
+  const keyErr = validateApiKey(raw.apiKey);
+  if (keyErr) return { creds: null, error: keyErr };
+
+  let orgId: string;
+  try {
+    orgId = await resolveOrgId(raw.apiKey);
+  } catch (e) {
+    return {
+      creds: null,
+      error: e instanceof Error ? e.message : "Could not resolve organization.",
+    };
+  }
+
+  const creds = { apiKey: raw.apiKey, orgId };
+  const invalid = validateCreds(creds);
+  if (invalid) return { creds: null, error: invalid };
+  return { creds };
 }
 
 /** Strict allowlist — only these exact static strings may be sent to Superwall. */
@@ -53,11 +160,36 @@ function registerAllowedSql(sql: string): string {
   return sql;
 }
 
+function friendlyQueryError(status: number, body: string): Error {
+  if (status === 401 || status === 403) {
+    return new Error(
+      "Superwall rejected this key. Use an Organization API Key from Settings → Keys.",
+    );
+  }
+  if (status === 429) {
+    return new Error("Superwall is busy. Wait a moment and try again.");
+  }
+  try {
+    const j = JSON.parse(body) as { message?: string; code?: string };
+    if (j.message?.toLowerCase().includes("not a member of organization")) {
+      return new Error(
+        "Wrong organization number. Leave Org ID blank — we find it from your key.",
+      );
+    }
+    if (j.message) {
+      // Cap and strip sensitive bits
+      return new Error(j.message.slice(0, 200));
+    }
+  } catch {
+    /* ignore */
+  }
+  return new Error("Could not load data from Superwall. Try again.");
+}
+
 export async function runClickHouseQuery(
   sql: string,
   creds: SuperwallCreds,
 ): Promise<string> {
-  // Defense in depth: exact allowlist only (no user input ever reaches here)
   if (!ALLOWED_SQL.has(sql)) {
     throw new Error("Invalid query.");
   }
@@ -65,36 +197,28 @@ export async function runClickHouseQuery(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
   try {
-    const res = await fetch(`${API_BASE}/organizations/${encodeURIComponent(creds.orgId)}/query`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${creds.apiKey}`,
-        "Content-Type": "text/plain",
-        Accept: "*/*",
-        "User-Agent": "SuperwallSubscribersDashboard/1.1",
+    const res = await fetch(
+      `${API_BASE}/organizations/${encodeURIComponent(creds.orgId)}/query`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${creds.apiKey}`,
+          "Content-Type": "text/plain",
+          Accept: "*/*",
+          "User-Agent": "SuperwallSubscribersDashboard/1.2",
+        },
+        body: sql,
+        cache: "no-store",
+        signal: controller.signal,
       },
-      body: sql,
-      cache: "no-store",
-      signal: controller.signal,
-    });
+    );
 
     const text = await res.text();
-    if (!res.ok) {
-      if (res.status === 401 || res.status === 403) {
-        throw new Error(
-          "Superwall rejected these credentials. Check the org ID and that the key has data:read.",
-        );
-      }
-      if (res.status === 429) {
-        throw new Error("Superwall is rate-limiting requests. Wait a minute and try again.");
-      }
-      // Do not forward raw Superwall error bodies (may contain internal detail)
-      throw new Error(`Superwall Query API returned ${res.status}. Try again in a moment.`);
-    }
+    if (!res.ok) throw friendlyQueryError(res.status, text);
     return text;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("Superwall query timed out. Try again in a moment.");
+      throw new Error("Superwall timed out. Try again.");
     }
     throw err;
   } finally {
@@ -106,10 +230,9 @@ export function parseJsonEachRow<T>(raw: string): T[] {
   const trimmed = raw.trim();
   if (!trimmed) return [];
   if (trimmed.startsWith("{") && trimmed.includes('"type":"api_error"')) {
-    throw new Error("Superwall returned an API error. Check credentials and try again.");
+    throw new Error("Superwall returned an error. Check your key and try again.");
   }
   const lines = trimmed.split("\n").filter(Boolean);
-  // Hard cap rows parsed client-side for memory safety
   const max = 50_000;
   const slice = lines.length > max ? lines.slice(0, max) : lines;
   const out: T[] = [];
@@ -117,13 +240,12 @@ export function parseJsonEachRow<T>(raw: string): T[] {
     try {
       out.push(JSON.parse(line) as T);
     } catch {
-      // skip corrupt lines rather than failing the whole payload
+      /* skip corrupt lines */
     }
   }
   return out;
 }
 
-/** Prefer human app names over numeric App Store IDs when both exist. */
 export const APPS_SQL = registerAllowedSql(`
 SELECT
   applicationId,
@@ -151,9 +273,7 @@ FORMAT JSONEachRow
 `.trim());
 
 /**
- * All subscribers across apps in the connected Superwall org.
- * Uses revenue + status + usage. Infers next billing when expiration is missing.
- * Static SQL only — no user input is ever interpolated.
+ * All subscribers across apps. Static SQL only.
  */
 export const USERS_SQL = registerAllowedSql(`
 WITH

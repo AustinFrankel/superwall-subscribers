@@ -1,135 +1,49 @@
 # Superwall Subscribers
 
-A simple, mobile-friendly dashboard for your **Superwall** subscribers.
+Live subscriber dashboard for Superwall.
 
-See who is active, who is cancelling, how much they spent, and when they renew — across every app in your org.
-
-**Live site:** https://superwall-users-dashboard.vercel.app  
-
+**Site:** https://superwall-users-dashboard.vercel.app  
 **GitHub:** https://github.com/AustinFrankel/superwall-subscribers  
 
-**Built by [Austin Frankel](https://github.com/AustinFrankel)**
+Built by [Austin Frankel](https://github.com/AustinFrankel)
 
----
+## Connect
 
-## How to connect (super simple)
+1. Superwall → **Settings → Keys**
+2. Under **Organization API Keys**, create or copy a key (`sk_…`)
+3. Paste it on the site → **Connect**
 
-Superwall does **not** offer one-click OAuth for third-party dashboards. You create a **read-only** key once (~1 minute). The site walks you through this with screenshots.
+No org ID needed. We resolve it from your key.
 
-### Steps
+Do **not** use the public `pk_` key.
 
-1. **Open Superwall** → [superwall.com](https://superwall.com) and log in.
-2. Go to **Settings → API Keys**  
-   Direct link: [Open API Keys](https://superwall.com/select-application?pathname=/applications/:app/settings/api-keys)
-3. **Create a key** with only **`data:read`** (you do not need write/admin).
-4. **Copy** your **Organization ID** (numbers) and the **API key**.
-5. **Paste** them on this site → **Connect**.
+## Privacy
 
-On mobile you can use **One paste**: put both in one box as:
+- Key stays in your browser only
+- Not saved on our servers
+- Static Superwall queries only
+- Optional Redis rate limits (Upstash)
 
-```text
-YOUR_ORG_ID|your_api_key_here
-```
+## Redis (optional)
 
-### One-link pairing (easiest way to open again)
-
-After you connect once:
-
-1. Open the sidebar → **Copy one-link**
-2. Open that link on another device or bookmark it
-
-The secret lives in the **URL hash** (`#connect=…`), so it is **not** sent to our server in the page request. Clear the link if you shared it by mistake, and rotate the Superwall key if needed.
-
----
-
-## Privacy & security
-
-| What | How |
-|------|-----|
-| Where keys live | Your browser `localStorage` only |
-| Server storage | **None** — we never save your API key |
-| API proxy | Browser → this app → Superwall (key in request headers only) |
-| SQL | Exact allowlist of static queries only |
-| Rate limits | **Upstash Redis** sliding window when configured; in-memory fallback otherwise. Keys = IP + credential fingerprint (never the raw API key) |
-| Origin | Cross-site browser calls blocked |
-| Headers | CSP, HSTS, `X-Frame-Options: DENY`, no-store on APIs |
-| Permissions | Use **`data:read` only** |
-| Dummy data | **None** — unauthenticated APIs return empty lists |
-
-### Redis rate limiting (recommended)
-
-1. Create a free Redis database at [Upstash](https://upstash.com).
-2. In Vercel → Project → Settings → Environment Variables, add:
+On Vercel, add:
 
 ```bash
-UPSTASH_REDIS_REST_URL=https://….upstash.io
-UPSTASH_REDIS_REST_TOKEN=…
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 ```
 
-3. Redeploy. Check `GET /api/health` — `"rateLimit":"redis"`.
+Without Redis, in-memory limits still apply.
 
-Without Redis the app still works with per-instance memory limits.
-
-This is designed so the dashboard is hard to abuse: no cookie sessions to steal for Superwall, no writable Superwall actions, and no secret stored server-side for the public connect flow.
-
----
-
-## Run locally
+## Local
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
-
-Optional (private self-host only — skip if people use the connect screen):
-
 ```bash
-# .env.local
-ALLOW_ENV_CREDS=1
-SUPERWALL_API_KEY=
-SUPERWALL_ORG_ID=
-```
-
-Without `ALLOW_ENV_CREDS=1`, env keys are ignored so a public host cannot
-accidentally expose your org if those vars are set.
-
----
-
-## Scripts
-
-```bash
-npm run build         # production build
-npm run start         # serve production build
-npm run lint
-npm run qa            # format + security/privacy static QA
-npm run qa:smoke      # API smoke vs running server (no Superwall key needed)
-npm run qa:all        # lint + qa + production build
-# live Superwall e2e (needs real creds + running server):
-SUPERWALL_API_KEY=… SUPERWALL_ORG_ID=… npm run qa:e2e
-```
-
-Smoke test:
-
-```bash
-npm run build && npm run start &
-sleep 2
+npm run qa
+npm run build
 BASE_URL=http://localhost:3000 npm run qa:smoke
 ```
-
----
-
-## Deploy
-
-Push to GitHub and deploy on **Vercel**. No env vars required if users connect from the UI.
-
-```bash
-git push origin main
-```
-
----
-
-## License
-
-Private / personal project. Built by Austin Frankel.

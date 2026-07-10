@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { cleanAppName } from "@/lib/format";
 import {
   APPS_SQL,
-  credsFromRequest,
   parseJsonEachRow,
+  resolveCredsFromRequest,
   runClickHouseQuery,
-  validateCreds,
 } from "@/lib/superwall";
 import type { AppInfo } from "@/lib/types";
 import {
@@ -20,7 +19,7 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const LIMIT = 30;
+const LIMIT = 90;
 const WINDOW_MS = 60_000;
 
 export async function GET(req: Request) {
@@ -32,7 +31,7 @@ export async function GET(req: Request) {
     );
   }
 
-  const creds = credsFromRequest(req);
+  const { creds, error: credsError } = await resolveCredsFromRequest(req);
   const rl = await rateLimitAsync(
     rateLimitKey("apps", req, creds?.apiKey, creds?.orgId),
     LIMIT,
@@ -40,7 +39,7 @@ export async function GET(req: Request) {
   );
   if (!rl.ok) {
     return NextResponse.json(
-      { error: "Too many requests. Wait a minute and try again.", apps: [] },
+      { error: "Too many requests. Wait a minute.", apps: [] },
       {
         status: 429,
         headers: apiSecurityHeaders(rateLimitHeaders(rl, LIMIT)),
@@ -50,16 +49,8 @@ export async function GET(req: Request) {
 
   if (!creds) {
     return NextResponse.json(
-      { error: "Connect your Superwall account first.", apps: [] },
+      { error: credsError || "Connect first.", apps: [] },
       { status: 401, headers: apiSecurityHeaders() },
-    );
-  }
-
-  const invalid = validateCreds(creds);
-  if (invalid) {
-    return NextResponse.json(
-      { error: invalid, apps: [] },
-      { status: 400, headers: apiSecurityHeaders() },
     );
   }
 
@@ -84,10 +75,7 @@ export async function GET(req: Request) {
     );
   } catch (err) {
     return NextResponse.json(
-      {
-        error: publicError(err, "Could not load apps."),
-        apps: [],
-      },
+      { error: publicError(err, "Could not load apps."), apps: [] },
       { status: 500, headers: apiSecurityHeaders() },
     );
   }

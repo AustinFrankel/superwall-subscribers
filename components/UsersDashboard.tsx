@@ -290,22 +290,16 @@ function ConnectScreen({
   error: string | null;
   busy: boolean;
 }) {
-  const [orgId, setOrgId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [pasteAll, setPasteAll] = useState("");
-  const [mode, setMode] = useState<"fields" | "paste">("fields");
 
-  function tryPastePair(text: string) {
-    const pair = parsePastedPair(text);
-    if (pair) {
-      setOrgId(pair.orgId);
+  function onKeyChange(value: string) {
+    const pair = parsePastedPair(value.trim());
+    if (pair?.apiKey) {
       setApiKey(pair.apiKey);
-      setPasteAll("");
-      setMode("fields");
-      return true;
+      return;
     }
-    return false;
+    setApiKey(value);
   }
 
   return (
@@ -313,122 +307,61 @@ function ConnectScreen({
       <div className="connect-layout">
         <div className="connect-card">
           <div className="connect-brand">
-            <div className="connect-logo" aria-hidden>
-              S
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/superwall-logo.png"
+              alt=""
+              width={48}
+              height={48}
+              className="connect-logo-img"
+            />
             <div>
               <h1>Superwall Subscribers</h1>
-              <p className="connect-tagline">
-                See who pays, who cancels, and when they renew — across every app.
-              </p>
+              <p className="connect-tagline">Who pays, who cancels, when they renew.</p>
             </div>
           </div>
 
-          <div className="connect-mode-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "fields"}
-              className={`chip ${mode === "fields" ? "active" : ""}`}
-              onClick={() => setMode("fields")}
-            >
-              Two fields
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "paste"}
-              className={`chip ${mode === "paste" ? "active" : ""}`}
-              onClick={() => setMode("paste")}
-            >
-              One paste
-            </button>
-          </div>
-
-          {mode === "fields" ? (
-            <>
-              <label className="field">
-                <span>Organization ID</span>
-                <input
-                  value={orgId}
-                  onChange={(e) => setOrgId(e.target.value)}
-                  placeholder="Numbers only"
-                  autoComplete="off"
-                  spellCheck={false}
-                  inputMode="numeric"
-                  enterKeyHint="next"
-                />
-              </label>
-
-              <label className="field">
-                <span>API key</span>
-                <div className="field-row">
-                  <input
-                    type={showKey ? "text" : "password"}
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Key with data:read"
-                    autoComplete="off"
-                    spellCheck={false}
-                    enterKeyHint="go"
-                  />
-                  <button
-                    type="button"
-                    className="btn field-toggle"
-                    onClick={() => setShowKey((v) => !v)}
-                  >
-                    {showKey ? "Hide" : "Show"}
-                  </button>
-                </div>
-              </label>
-            </>
-          ) : (
-            <label className="field">
-              <span>Paste both at once</span>
-              <textarea
-                className="paste-area"
-                value={pasteAll}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setPasteAll(v);
-                  tryPastePair(v);
-                }}
-                placeholder={'orgId|api_key\nor JSON: {"orgId":"…","apiKey":"…"}'}
-                rows={4}
-                spellCheck={false}
+          <label className="field">
+            <span>Organization API key</span>
+            <div className="field-row">
+              <input
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => onKeyChange(e.target.value)}
+                placeholder="sk_…"
                 autoComplete="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && apiKey.trim().length >= 16 && !busy) {
+                    onConnect({ orgId: "", apiKey: apiKey.trim() });
+                  }
+                }}
               />
-              <span className="field-hint">
-                Easiest on mobile: copy both, paste here, we split them for you.
-              </span>
-            </label>
-          )}
+              <button
+                type="button"
+                className="btn field-toggle"
+                onClick={() => setShowKey((v) => !v)}
+              >
+                {showKey ? "Hide" : "Show"}
+              </button>
+            </div>
+          </label>
 
-          <div className="security-note" role="note">
-            <strong>Private by design.</strong> Your key is stored only in this
-            browser. Requests go through this site to Superwall — we never save
-            your key on a server. Use a <code>data:read</code> key only.
-          </div>
+          <p className="field-hint quiet">
+            From Superwall → Settings → Keys. Starts with sk_. We find your org for you.
+          </p>
 
           {error ? <div className="error tight">{error}</div> : null}
 
           <button
             type="button"
             className="btn primary"
-            disabled={busy || !orgId.trim() || !apiKey.trim()}
-            onClick={() =>
-              onConnect({ orgId: orgId.trim(), apiKey: apiKey.trim() })
-            }
+            disabled={busy || apiKey.trim().length < 16}
+            onClick={() => onConnect({ orgId: "", apiKey: apiKey.trim() })}
           >
             {busy ? "Connecting…" : "Connect"}
           </button>
-
-          <p className="one-link-note">
-            <strong>One-link tip:</strong> after you connect, use{" "}
-            <em>Copy one-link</em> in the sidebar to open this dashboard on
-            another device. Treat that link like a password — anyone with it can
-            read your Superwall data. Prefer a <code>data:read</code> key.
-          </p>
 
           <SiteFooter />
         </div>
@@ -523,19 +456,22 @@ export default function UsersDashboard() {
           const pingJson = (await ping.json()) as {
             ok?: boolean;
             error?: string;
+            orgId?: string;
           };
           if (!ping.ok || !pingJson.ok) {
             dispatch({
               type: "LOAD_ERR",
-              error:
-                pingJson.error ||
-                "One-link credentials failed. Create a new key and try again.",
+              error: pingJson.error || "One-link failed. Try connecting again.",
             });
             return;
           }
+          const resolved: StoredCreds = {
+            apiKey: fromHash.apiKey,
+            orgId: pingJson.orgId || fromHash.orgId || "",
+          };
           const res = await fetch("/api/users", {
             cache: "no-store",
-            headers: authHeaders(fromHash),
+            headers: authHeaders(resolved),
           });
           const json = (await res.json()) as UsersResponse;
           if (!res.ok || json.error) {
@@ -546,8 +482,8 @@ export default function UsersDashboard() {
             });
             return;
           }
-          saveCreds(fromHash);
-          dispatch({ type: "SET_CREDS", creds: fromHash });
+          saveCreds(resolved);
+          dispatch({ type: "SET_CREDS", creds: resolved });
           dispatch({ type: "LOAD_OK", data: json });
         } catch (e) {
           dispatch({
@@ -624,19 +560,25 @@ export default function UsersDashboard() {
       const pingJson = (await ping.json()) as {
         ok?: boolean;
         error?: string;
+        orgId?: string;
       };
       if (!ping.ok || !pingJson.ok) {
         dispatch({
           type: "LOAD_ERR",
-          error: pingJson.error || "Could not connect with those credentials.",
+          error: pingJson.error || "Could not connect.",
         });
         return;
       }
 
-      const ok = await load(false, next);
+      const resolved: StoredCreds = {
+        apiKey: next.apiKey,
+        orgId: pingJson.orgId || next.orgId || "",
+      };
+
+      const ok = await load(false, resolved);
       if (ok) {
-        saveCreds(next);
-        dispatch({ type: "SET_CREDS", creds: next });
+        saveCreds(resolved);
+        dispatch({ type: "SET_CREDS", creds: resolved });
       }
     } catch (e) {
       dispatch({

@@ -1,17 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f0f2f5;
+  --aqua: #74fff1;
+  --aqua-2: #75fff1;
+  --woodsmoke: #13151a;
+  --bg: #f4f5f7;
   --panel: #ffffff;
-  --sidebar: #111827;
-  --sidebar-text: #e5e7eb;
-  --sidebar-muted: #9ca3af;
-  --sidebar-active: #1f2937;
-  --text: #111827;
+  --sidebar: #13151a;
+  --sidebar-text: #e8eaed;
+  --sidebar-muted: #8b919c;
+  --sidebar-active: #1c1f26;
+  --text: #13151a;
   --muted: #6b7280;
   --border: #e5e7eb;
-  --accent: #0f766e;
-  --accent-soft: #ccfbf1;
+  --accent: #0d9488;
+  --accent-soft: #d5fffb;
   --ok: #047857;
   --ok-bg: #d1fae5;
   --warn: #b45309;
@@ -21,11 +24,11 @@
   --muted-bg: #f3f4f6;
   --error: #991b1b;
   --error-bg: #fee2e2;
-  --bar: #0f766e;
+  --bar: #14b8a6;
   --bar-urgent: #dc2626;
   --bar-cancel: #fb923c;
-  --shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
-  --radius: 16px;
+  --shadow: 0 8px 32px rgba(19, 21, 26, 0.08);
+  --radius: 14px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 }
@@ -129,7 +132,7 @@ textarea {
 
 .nav-item.active {
   background: var(--sidebar-active);
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 3px 0 0 var(--aqua);
 }
 
 .nav-label {
@@ -203,7 +206,7 @@ textarea {
   min-height: 100dvh;
   padding: calc(20px + var(--safe-top)) 16px calc(28px + var(--safe-bottom));
   background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, #ccfbf1 0%, transparent 55%),
+    radial-gradient(ellipse 70% 45% at 50% -15%, rgba(116, 255, 241, 0.22) 0%, transparent 55%),
     var(--bg);
 }
 
@@ -232,17 +235,13 @@ textarea {
   margin-bottom: 18px;
 }
 
-.connect-logo {
-  width: 44px;
-  height: 44px;
+.connect-logo-img {
+  width: 48px;
+  height: 48px;
   border-radius: 12px;
-  background: linear-gradient(145deg, #0f766e, #115e59);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 1.2rem;
+  object-fit: cover;
   flex-shrink: 0;
+  background: var(--woodsmoke);
 }
 
 .connect-card h1 {
@@ -299,8 +298,8 @@ textarea {
 .paste-area:focus,
 .search:focus,
 .select:focus {
-  outline: 2px solid #99f6e4;
-  border-color: var(--accent);
+  outline: 2px solid rgba(116, 255, 241, 0.7);
+  border-color: #14b8a6;
 }
 
 .field-row {
@@ -331,45 +330,33 @@ textarea {
   color: var(--muted);
 }
 
-.security-note {
-  background: #f0fdfa;
-  border: 1px solid #99f6e4;
-  border-radius: 10px;
-  padding: 10px 12px;
+.field-hint.quiet {
+  margin: -4px 0 14px;
   font-size: 0.78rem;
-  color: #115e59;
-  line-height: 1.4;
-  margin-bottom: 14px;
-}
-
-.security-note strong {
-  display: block;
-  margin-bottom: 2px;
-}
-
-.one-link-note {
-  margin: 14px 0 0;
-  font-size: 0.75rem;
   color: var(--muted);
-  line-height: 1.45;
+  line-height: 1.4;
+  font-weight: 400;
 }
 
 .btn.primary {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
+  background: var(--woodsmoke);
+  color: var(--aqua);
+  border-color: var(--woodsmoke);
   width: 100%;
   padding: 12px 14px;
   min-height: 48px;
   border-radius: 12px;
   font-size: 0.95rem;
+  font-weight: 650;
 }
 
 .btn.primary:hover:not(:disabled) {
-  filter: brightness(0.95);
+  filter: brightness(1.12);
 }
 
 .btn.primary.linkish {
+  background: var(--woodsmoke);
+  color: var(--aqua);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -515,7 +502,7 @@ textarea {
 }
 
 .guide-step-dot.active {
-  border-color: #99f6e4;
+  border-color: var(--aqua);
   background: var(--accent-soft);
 }
 
@@ -537,8 +524,8 @@ textarea {
 }
 
 .guide-step-dot.active .guide-step-num {
-  background: var(--accent);
-  color: #fff;
+  background: var(--woodsmoke);
+  color: var(--aqua);
 }
 
 .guide-step-label {
@@ -550,7 +537,7 @@ textarea {
 }
 
 .guide-step-dot.active .guide-step-label {
-  color: var(--accent);
+  color: var(--woodsmoke);
 }
 
 .guide-figure {
@@ -795,8 +782,8 @@ textarea {
 
 .chip.active {
   background: var(--accent-soft);
-  border-color: #99f6e4;
-  color: var(--accent);
+  border-color: var(--aqua);
+  color: var(--woodsmoke);
 }
 
 .filters {
@@ -1078,7 +1065,7 @@ tbody tr:hover {
 }
 
 .site-footer a {
-  color: var(--accent);
+  color: var(--woodsmoke);
   text-decoration: none;
   font-weight: 550;
 }
@@ -1101,7 +1088,7 @@ tbody tr:hover {
 }
 
 .site-footer.dark a {
-  color: #5eead4;
+  color: var(--aqua);
 }
 
 /* ─── Responsive ─── */

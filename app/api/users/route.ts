@@ -13,10 +13,9 @@ import {
 import {
   APPS_SQL,
   USERS_SQL,
-  credsFromRequest,
   parseJsonEachRow,
+  resolveCredsFromRequest,
   runClickHouseQuery,
-  validateCreds,
 } from "@/lib/superwall";
 import type { AppInfo, SubscriberRow, UsersResponse } from "@/lib/types";
 import {
@@ -32,7 +31,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 120;
 
-const LIMIT = 12;
+// Comfortable for normal refresh; still blocks scrapers
+const LIMIT = 60;
 const WINDOW_MS = 60_000;
 
 type RawUser = {
@@ -174,35 +174,24 @@ export async function GET(req: Request) {
     });
   }
 
-  const creds = credsFromRequest(req);
+  const { creds, error: credsError } = await resolveCredsFromRequest(req);
   const rl = await rateLimitAsync(
     rateLimitKey("users", req, creds?.apiKey, creds?.orgId),
     LIMIT,
     WINDOW_MS,
   );
   if (!rl.ok) {
-    return NextResponse.json(
-      emptyBody("Too many requests. Wait a minute and try again."),
-      {
-        status: 429,
-        headers: apiSecurityHeaders(rateLimitHeaders(rl, LIMIT)),
-      },
-    );
+    return NextResponse.json(emptyBody("Too many requests. Wait a minute."), {
+      status: 429,
+      headers: apiSecurityHeaders(rateLimitHeaders(rl, LIMIT)),
+    });
   }
 
   if (!creds) {
     return NextResponse.json(
-      emptyBody("Connect your Superwall account first."),
+      emptyBody(credsError || "Paste your Superwall Organization API key."),
       { status: 401, headers: apiSecurityHeaders() },
     );
-  }
-
-  const invalid = validateCreds(creds);
-  if (invalid) {
-    return NextResponse.json(emptyBody(invalid), {
-      status: 400,
-      headers: apiSecurityHeaders(),
-    });
   }
 
   try {

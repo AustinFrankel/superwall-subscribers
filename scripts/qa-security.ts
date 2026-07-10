@@ -13,7 +13,7 @@ import {
   rateLimitMemory,
   sanitizeHeader,
 } from "../lib/security";
-import { validateCreds } from "../lib/superwall";
+import { validateApiKey, validateCreds } from "../lib/superwall";
 import { parseConnectHash, parsePastedPair } from "../lib/creds";
 
 const ROOT = join(__dirname, "..");
@@ -80,13 +80,12 @@ console.log("\n== credential fingerprint ==");
 
 console.log("\n== validateCreds ==");
 {
-  assert(validateCreds({ orgId: "12", apiKey: "a".repeat(20) }) === null, "valid creds");
-  assert(validateCreds({ orgId: "abc", apiKey: "a".repeat(20) }) !== null, "reject non-numeric org");
-  assert(validateCreds({ orgId: "1", apiKey: "short" }) !== null, "reject short key");
-  assert(
-    validateCreds({ orgId: "1", apiKey: "has space in key!!!" }) !== null,
-    "reject spaced key",
-  );
+  assert(validateCreds({ orgId: "12", apiKey: "sk_" + "a".repeat(20) }) === null, "valid creds");
+  assert(validateCreds({ orgId: "abc", apiKey: "sk_" + "a".repeat(20) }) !== null, "reject non-numeric org");
+  assert(validateApiKey("short") !== null, "reject short key");
+  assert(validateApiKey("pk_public_key_xxxxxx") !== null, "reject public pk_ key");
+  assert(validateApiKey("has space in key!!!!!") !== null, "reject spaced key");
+  assert(parsePastedPair("sk_" + "b".repeat(30))?.apiKey?.startsWith("sk_"), "bare sk_ paste");
 }
 
 console.log("\n== sanitize / publicError ==");
@@ -118,20 +117,15 @@ console.log("\n== origin guard ==");
 
 console.log("\n== connect hash / paste (no real secrets) ==");
 {
-  const fakeKey = "demo_readonly_key_xx";
-  // build manually like product does
-  const b64 = Buffer.from(`999|${fakeKey}`, "utf8")
+  const fakeKey = "sk_demo_readonly_key_xx_long";
+  const b64 = Buffer.from(fakeKey, "utf8")
     .toString("base64")
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
   const parsed = parseConnectHash(`#connect=${b64}`);
-  assert(parsed?.orgId === "999" && parsed.apiKey === fakeKey, "parse connect hash");
+  assert(parsed?.apiKey === fakeKey, "parse connect hash key-only");
   assert(parseConnectHash("#") === null, "empty hash null");
-  assert(
-    parsePastedPair("999|demo_readonly_key_xx")?.orgId === "999",
-    "parse paste pair",
-  );
   assert(parsePastedPair("not-a-pair") === null, "reject junk paste");
 }
 

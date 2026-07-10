@@ -7,30 +7,26 @@ const STEPS = [
   {
     n: 1,
     title: "Open Superwall",
-    plain: "Go to superwall.com and log in.",
+    plain: "Log in at superwall.com",
     img: "/guide/step-1-open-superwall.svg",
-    alt: "Browser open to superwall.com",
   },
   {
     n: 2,
-    title: "Settings → API Keys",
-    plain: "Click Settings, then click API Keys.",
+    title: "Settings → Keys",
+    plain: "Left menu: click Keys (not the public pk_ key)",
     img: "/guide/step-2-settings.svg",
-    alt: "Settings menu with API Keys highlighted",
   },
   {
     n: 3,
-    title: "Make a key (data:read)",
-    plain: "Create a new key. Only turn on data:read.",
+    title: "New API Key",
+    plain: "Under Organization API Keys, click + New API Key",
     img: "/guide/step-3-create-key.svg",
-    alt: "Create API key with data:read permission",
   },
   {
     n: 4,
-    title: "Copy & paste here",
-    plain: "Copy your Organization ID and API key. Paste them below.",
+    title: "Paste here",
+    plain: "Copy the sk_ key and paste it below",
     img: "/guide/step-4-copy-paste.svg",
-    alt: "Copy keys from Superwall and paste into this site",
   },
 ] as const;
 
@@ -40,14 +36,14 @@ export default function ConnectGuide() {
   const current = STEPS[step];
 
   return (
-    <section className="guide" aria-labelledby="guide-heading">
+    <section className="guide">
       <button
         type="button"
         className="guide-toggle"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span id="guide-heading">How do I get my Superwall keys?</span>
+        <span>How to get your key</span>
         <span className="guide-chevron" aria-hidden>
           {open ? "−" : "+"}
         </span>
@@ -55,12 +51,6 @@ export default function ConnectGuide() {
 
       {open ? (
         <div className="guide-body">
-          <p className="guide-intro">
-            Superwall does not offer one-click login for third-party tools.
-            You create a <strong>read-only</strong> API key once (about 1
-            minute). We never store your key on a server — only in your browser.
-          </p>
-
           <div className="guide-actions">
             <a
               className="btn primary linkish"
@@ -68,7 +58,7 @@ export default function ConnectGuide() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Open Superwall API Keys ↗
+              Open Keys
             </a>
             <a
               className="btn ghost-light"
@@ -76,18 +66,17 @@ export default function ConnectGuide() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Open Superwall
+              Superwall
             </a>
           </div>
 
-          <ol className="guide-steps-nav" aria-label="Steps">
+          <ol className="guide-steps-nav">
             {STEPS.map((s, i) => (
               <li key={s.n}>
                 <button
                   type="button"
                   className={`guide-step-dot ${i === step ? "active" : ""} ${i < step ? "done" : ""}`}
                   onClick={() => setStep(i)}
-                  aria-current={i === step ? "step" : undefined}
                 >
                   <span className="guide-step-num">{s.n}</span>
                   <span className="guide-step-label">{s.title}</span>
@@ -100,16 +89,15 @@ export default function ConnectGuide() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={current.img}
-              alt={current.alt}
+              alt={current.plain}
               width={720}
-              height={420}
+              height={400}
               className="guide-img"
               loading={step === 0 ? "eager" : "lazy"}
-              decoding="async"
             />
             <figcaption>
               <strong>
-                Step {current.n}: {current.title}
+                {current.n}. {current.title}
               </strong>
               <span>{current.plain}</span>
             </figcaption>
@@ -130,17 +118,9 @@ export default function ConnectGuide() {
               disabled={step === STEPS.length - 1}
               onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
             >
-              Next step
+              Next
             </button>
           </div>
-
-          <ul className="guide-checklist">
-            <li>Organization ID = numbers only</li>
-            <li>
-              Permission needed = <code>data:read</code> only
-            </li>
-            <li>Key is kept in your browser (localStorage), not on our servers</li>
-          </ul>
         </div>
       ) : null}
     </section>

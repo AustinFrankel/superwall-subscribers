@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import {
   PING_SQL,
-  credsFromRequest,
   parseJsonEachRow,
+  resolveCredsFromRequest,
   runClickHouseQuery,
-  validateCreds,
 } from "@/lib/superwall";
 import {
   apiSecurityHeaders,
@@ -18,7 +17,8 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const LIMIT = 20;
+// Light limit — connect + refresh; protect abuse without blocking normal use
+const LIMIT = 120;
 const WINDOW_MS = 60_000;
 
 export async function GET(req: Request) {
@@ -30,7 +30,8 @@ export async function GET(req: Request) {
     );
   }
 
-  const creds = credsFromRequest(req);
+  const { creds, error: credsError } = await resolveCredsFromRequest(req);
+
   const rl = await rateLimitAsync(
     rateLimitKey("ping", req, creds?.apiKey, creds?.orgId),
     LIMIT,
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
   );
   if (!rl.ok) {
     return NextResponse.json(
-      { ok: false, error: "Too many requests. Wait a minute and try again." },
+      { ok: false, error: "Too many requests. Wait a minute." },
       {
         status: 429,
         headers: apiSecurityHeaders(rateLimitHeaders(rl, LIMIT)),
@@ -48,16 +49,11 @@ export async function GET(req: Request) {
 
   if (!creds) {
     return NextResponse.json(
-      { ok: false, error: "Connect your Superwall account first." },
+      {
+        ok: false,
+        error: credsError || "Paste your Superwall Organization API key.",
+      },
       { status: 401, headers: apiSecurityHeaders() },
-    );
-  }
-
-  const invalid = validateCreds(creds);
-  if (invalid) {
-    return NextResponse.json(
-      { ok: false, error: invalid },
-      { status: 400, headers: apiSecurityHeaders() },
     );
   }
 
@@ -69,7 +65,6 @@ export async function GET(req: Request) {
       {
         ok: true,
         apps,
-        // orgId is not a secret; helps the UI confirm which org connected
         orgId: creds.orgId,
       },
       {
